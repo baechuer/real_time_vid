@@ -7,6 +7,12 @@ The core philosophy of this demo is to handle P2P signaling without participatin
 
 ---
 
+## Tech Stack
+- **Backend (Signaling Server)**: Node.js, TypeScript, WebSockets (e.g., `ws`), request validation (`zod`), and execution/build tools (`tsx`, `tsc`).
+- **Frontend (Web Client)**: HTML5, CSS3, Vanilla JavaScript (or TypeScript), and Native WebRTC APIs (`RTCPeerConnection`, `getUserMedia`).
+
+---
+
 ## 2. Architecture & Component Decomposition
 
 ### 2.1 Signaling Server (Node.js + TypeScript + WebSocket)
