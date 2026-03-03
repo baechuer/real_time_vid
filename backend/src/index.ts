@@ -1,4 +1,5 @@
 import { WebSocket, WebSocketServer, RawData } from "ws";
+import { v4 as uuidv4 } from "uuid";
 import { AnyMessageSchema, createErrorMessage } from "./messages.js";
 import { roomManager } from "./state.js";
 
@@ -7,13 +8,14 @@ const wss = new WebSocketServer({ port: 8080 });
 console.log("WebSocket signaling server running on ws://localhost:8080");
 
 wss.on("connection", (ws: WebSocket) => {
+    // Ephemeral Connection ID bound to this exact TCP stream
+    const connId = uuidv4();
     let currentRoomId: string | null = null;
-    let currentPeerId: string | null = null;
+    let currentSessionId: string | null = null;
 
-    console.log("Client connected");
+    console.log(`[Conn ${connId}] Client connected`);
 
     ws.on("message", (data: RawData) => {
-        // Enforce arbitrary 64KB max message size
         if (data.toString().length > 64 * 1024) {
             ws.send(createErrorMessage("BAD_MESSAGE", "Payload too large"));
             return;
@@ -24,34 +26,68 @@ wss.on("connection", (ws: WebSocket) => {
             const parsed = AnyMessageSchema.safeParse(parsedJson);
 
             if (!parsed.success) {
-                console.warn(`Validation failed: ${JSON.stringify(parsed.error.issues)}`);
+                console.warn(`[BAD_MESSAGE] Validation failed: ${JSON.stringify(parsed.error.issues)}`);
                 ws.send(createErrorMessage("BAD_MESSAGE", "Invalid message format"));
                 return;
             }
 
             const message = parsed.data;
 
-            if (message.type === "join") {
-                const room = roomManager.getOrCreateRoom(message.roomId);
+            // --- Phase 1.5: Explicit Room Creation (Idempotent) ---
+            if (message.type === "create") {
+                const existingRoomId = roomManager.getHostedRoomId(message.sessionId);
+                if (existingRoomId) {
+                    // Idempotent return
+                    console.log(`[Conn ${connId}] Idempotent create: ${message.sessionId} already hosts ${existingRoomId}`);
+                    ws.send(JSON.stringify({ type: "created", roomId: existingRoomId }));
+                    return;
+                }
 
-                // Re-joining same session shouldn't double count, but for 1v1 we just strictly enforce size
-                if (room.peers.size >= 2 && !room.peers.has(message.peerId)) {
+                const newRoomId = uuidv4().slice(0, 8); // Short room ID for demo
+                roomManager.createRoom(newRoomId, message.sessionId);
+                console.log(`[Room ${newRoomId}] Created by session ${message.sessionId}`);
+
+                ws.send(JSON.stringify({ type: "created", roomId: newRoomId }));
+                return;
+            }
+
+            // For all other messages, they MUST target an existing room
+            if (!("roomId" in message)) return;
+            const targetRoomId = message.roomId;
+
+            if (message.type === "join") {
+                const room = roomManager.getRoom(targetRoomId);
+
+                if (!room) {
+                    ws.send(createErrorMessage("ROOM_NOT_FOUND", "This meeting link is invalid or expired."));
+                    return;
+                }
+
+                // Check limits (allow reconnects for the same sessionId)
+                if (room.peers.size >= 2 && !room.peers.has(message.sessionId)) {
                     ws.send(createErrorMessage("ROOM_FULL", "Room is already full"));
                     return;
                 }
 
-                currentRoomId = message.roomId;
-                currentPeerId = message.peerId;
+                currentRoomId = targetRoomId;
+                currentSessionId = message.sessionId;
 
-                const isFirstPeer = room.peers.size === 0;
-                room.peers.set(message.peerId, { id: message.peerId, ws, isHost: isFirstPeer });
+                const isHost = room.hostSessionId === message.sessionId;
+                room.peers.set(message.sessionId, {
+                    sessionId: message.sessionId,
+                    connId, // Bind current transient connection 
+                    ws,
+                    isHost
+                });
 
-                console.log(`[Room ${message.roomId}] Peer ${message.peerId} joined. Total: ${room.peers.size}`);
-                // Optional: Tell user they connected
-                ws.send(JSON.stringify({ type: "joined", isHost: isFirstPeer }));
+                roomManager.markActive(targetRoomId);
+
+                console.log(`[Room ${targetRoomId}] Session ${message.sessionId} joined. Total: ${room.peers.size}`);
+                // Tell user they successfully connected to the room topology
+                ws.send(JSON.stringify({ type: "joined", isHost }));
             } else {
                 // Ensure they joined a room first
-                if (!currentRoomId || !currentPeerId || currentRoomId !== message.roomId) {
+                if (!currentRoomId || !currentSessionId || currentRoomId !== targetRoomId) {
                     ws.send(createErrorMessage("NOT_JOINED", "You must join the room before sending signaling messages"));
                     return;
                 }
@@ -59,46 +95,60 @@ wss.on("connection", (ws: WebSocket) => {
                 const room = roomManager.getRoom(currentRoomId);
                 if (!room) return;
 
-                // Typical relay: loop through peers and send to the *other* person.
+                roomManager.markActive(currentRoomId);
+
+                // Relay strictly to the *other* person.
                 let forwarded = false;
                 room.peers.forEach((peer) => {
-                    if (peer.id !== currentPeerId) {
+                    if (peer.sessionId !== currentSessionId) {
                         peer.ws.send(JSON.stringify(message));
                         forwarded = true;
                     }
                 });
 
                 if (!forwarded) {
-                    // It's helpful to log but we don't necessarily abort. 
-                    console.log(`[Room ${currentRoomId}] Peer ${currentPeerId} sent ${message.type} but no recipient is present.`);
+                    console.log(`[Room ${currentRoomId}] Peer ${currentSessionId} sent ${message.type} but no recipient is present.`);
                 }
             }
         } catch (e) {
-            console.error("Failed to parse JSON", e);
+            console.warn(`[BAD_MESSAGE] Failed to parse JSON, ignoring payload. (Payload length: ${data.toString().length})`);
             ws.send(createErrorMessage("BAD_MESSAGE", "Invalid JSON payload"));
         }
     });
 
     ws.on("close", () => {
-        if (currentRoomId && currentPeerId) {
+        if (currentRoomId && currentSessionId) {
             const room = roomManager.getRoom(currentRoomId);
             if (room) {
-                room.peers.delete(currentPeerId);
-                console.log(`[Room ${currentRoomId}] Peer ${currentPeerId} disconnected.`);
+                // Phase 2 Robustness: Only delete from room if connId strictly matches!
+                const didRemove = roomManager.removePeerIfConnectionMatches(room, currentSessionId, connId);
 
-                // If the disconnected peer was the host, re-assign
-                roomManager.reassignHost(room);
+                if (didRemove) {
+                    console.log(`[Room ${currentRoomId}] Session ${currentSessionId} formally disconnected.`);
 
-                // Automatically notify the remaining peer that their partner left
-                room.peers.forEach((peer) => {
-                    peer.ws.send(JSON.stringify({
-                        type: "hangup",
-                        roomId: currentRoomId,
-                        peerId: currentPeerId
-                    }));
-                });
+                    roomManager.reassignHost(room);
+
+                    // Notify partner
+                    room.peers.forEach((peer) => {
+                        if (peer.ws.readyState === WebSocket.OPEN) {
+                            peer.ws.send(JSON.stringify({
+                                type: "hangup",
+                                roomId: currentRoomId,
+                                sessionId: currentSessionId
+                            }));
+                        }
+                    });
+
+                    // If room is now totally empty, GC immediately
+                    if (room.peers.size === 0) {
+                        console.log(`[Room ${currentRoomId}] Empty after disconnect, sweeping immediately.`);
+                        roomManager.deleteRoom(currentRoomId);
+                    }
+                } else {
+                    console.log(`[Room ${currentRoomId}] Stale connection ${connId} for session ${currentSessionId} closed. Ignored.`);
+                }
             }
         }
-        console.log("Client socket completely closed");
+        console.log(`[Conn ${connId}] Client socket completely closed`);
     });
 });

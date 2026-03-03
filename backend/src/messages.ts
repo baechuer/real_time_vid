@@ -3,6 +3,7 @@ import { z } from "zod";
 // Error definitions
 export const ErrorCodes = {
     ROOM_FULL: "ROOM_FULL",
+    ROOM_NOT_FOUND: "ROOM_NOT_FOUND",
     BAD_MESSAGE: "BAD_MESSAGE",
     NOT_JOINED: "NOT_JOINED",
     PEER_NOT_READY: "PEER_NOT_READY",
@@ -11,11 +12,16 @@ export const ErrorCodes = {
 
 export type ErrorCode = keyof typeof ErrorCodes;
 
-// Base definition for every message
+// Base definition for every message EXCEPT "create"
 export const BaseMessageSchema = z.object({
     type: z.enum(["join", "offer", "answer", "ice-candidate", "hangup"]),
     roomId: z.string().min(1).max(64),
-    peerId: z.string().min(1).max(64),
+    sessionId: z.string().min(1).max(64),
+});
+
+export const CreateMessageSchema = z.object({
+    type: z.literal("create"),
+    sessionId: z.string().min(1).max(64),
 });
 
 export const JoinMessageSchema = BaseMessageSchema.extend({
@@ -43,6 +49,7 @@ export const HangupMessageSchema = BaseMessageSchema.extend({
 
 // A parsed, valid message type
 export const AnyMessageSchema = z.discriminatedUnion("type", [
+    CreateMessageSchema,
     JoinMessageSchema,
     OfferMessageSchema,
     AnswerMessageSchema,
@@ -60,3 +67,4 @@ export function createErrorMessage(code: ErrorCode, message: string) {
         message
     });
 }
+
