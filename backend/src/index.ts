@@ -60,6 +60,7 @@ wss.on("connection", (ws: WebSocket) => {
 
                 if (!room) {
                     ws.send(createErrorMessage("ROOM_NOT_FOUND", "This meeting link is invalid or expired."));
+                    ws.close();
                     return;
                 }
 
@@ -67,6 +68,7 @@ wss.on("connection", (ws: WebSocket) => {
                 if (room.peers.size >= 2 && !room.peers.has(message.sessionId)) {
                     console.log(`[Room ${targetRoomId}] Rejecting 3rd peer ${message.sessionId}. Room is FULL.`);
                     ws.send(createErrorMessage("ROOM_FULL", "Room is already full"));
+                    ws.close();
                     return;
                 }
 
