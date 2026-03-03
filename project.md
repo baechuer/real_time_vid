@@ -26,14 +26,20 @@ The signaling server acts solely as a message broker for peers in the same room.
   - Does NOT process, parse, or modify SDP or media streams.
   - Does NOT act as an SFU/MCU or TURN server.
 
-### 2.2 Web Client (Browser WebRTC)
-The client application runs in the browser and handles local media capture and peer-to-peer connections.
+### 2.2 Frontend (Browser WebRTC)
+The frontend application runs in the browser and handles local media capture and peer-to-peer connections.
 - **Responsibilities**:
   - Capture local audio and video using `getUserMedia`.
   - Establish `RTCPeerConnection` configured strictly with STUN servers.
   - Exchange SDP and ICE candidates via the Signaling Server.
   - Render local and remote video streams.
   - Handle connection state changes, including strict timeouts (20s) and fallback UX for failed ICE connections.
+
+### 2.3 Room Architecture (Room-by-ID)
+- **Room Creation**: Rooms are created dynamically when a peer attempts to `join(roomId)`.
+- **Host Role**: The first peer to join the room is designated as the `host`. If the `host` disconnects, the role is automatically seamlessly transferred to the remaining peer without disrupting the WebRTC connection.
+- **Constraints**: A strict maximum of 2 peers per room. Any 3rd peer attempting to join is rejected with a `ROOM_FULL` error.
+- **Lifecycle**: The room is immediately cleaned up and destroyed when the participant count reaches zero.
 
 ---
 
@@ -84,7 +90,7 @@ The client application runs in the browser and handles local media capture and p
 This execution plan prioritizes zero-dependency foundations, followed by basic plumbing, and finally robustness/edge-case handling.
 
 ### Phase 0: Repo & Tooling
-- [ ] Initialize monorepo or standard folder structure (`signaling-server/`, `client/`).
+- [ ] Initialize monorepo or standard folder structure (`backend/`, `frontend/`).
 - [ ] Setup Node.js + TS environment (`tsx` for dev, `tsc` for build).
 - [ ] Implement basic Linting/Formatting.
 > **Done when**: `npm run dev` successfully spins up a raw WS server and build artifacts are executable.
