@@ -231,7 +231,14 @@ async function handleSignalingMessage(msg: any) {
     roomLinkText.innerText = window.location.href;
     roomLinkContainer.classList.remove("hidden");
 
-    updateStatus(`Room Created. Waiting for someone to join...`);
+    updateStatus(`Room Created. Joining...`);
+
+    // Host must formally join the room topology
+    ws!.send(JSON.stringify({
+      type: "join",
+      roomId: currentRoomId,
+      sessionId
+    }));
     return;
   }
 
@@ -239,10 +246,12 @@ async function handleSignalingMessage(msg: any) {
     isHost = msg.isHost;
     updateStatus(`Joined room successfully as ${isHost ? "Host" : "Guest"}.`);
 
+    // Initialize PC early so it can catch and queue any incoming ICE candidates!
+    await initPeerConnection();
+
     // The one who joins late (Guest) ALWAYS sends the offer to avoid Glare.
     if (!isHost) {
       updateStatus("Initiating WebRTC Offer...");
-      await initPeerConnection();
       const offer = await pc!.createOffer();
       await pc!.setLocalDescription(offer);
 
@@ -252,6 +261,8 @@ async function handleSignalingMessage(msg: any) {
         sessionId,
         sdp: offer.sdp
       }));
+    } else {
+      updateStatus("Room active. Waiting for guest to connect...");
     }
     return;
   }
@@ -260,7 +271,11 @@ async function handleSignalingMessage(msg: any) {
 
   if (msg.type === "offer") {
     console.log("[Signaling] Received Offer. Creating Answer.");
-    await initPeerConnection();
+
+    // PC should already be initialized in "joined", but just in case:
+    if (!pc) {
+      await initPeerConnection();
+    }
 
     const offerDesc = new RTCSessionDescription({ type: "offer", sdp: msg.sdp });
     await pc!.setRemoteDescription(offerDesc);
@@ -277,6 +292,8 @@ async function handleSignalingMessage(msg: any) {
       sessionId,
       sdp: answer.sdp
     }));
+
+    updateStatus("Answering call...");
     return;
   }
 
