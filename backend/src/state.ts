@@ -49,8 +49,11 @@ export class RoomManager {
         // Check if there is still a host. If not, assign the first peer as host.
         const hasHost = remainingPeers.some(p => p.isHost);
         if (!hasHost) {
-            remainingPeers[0].isHost = true;
-            console.log(`[Room ${room.id}] New host assigned: ${remainingPeers[0].id}`);
+            const nextHost = remainingPeers[0];
+            if (nextHost) {
+                nextHost.isHost = true;
+                console.log(`[Room ${room.id}] New host assigned: ${nextHost.id}`);
+            }
         }
     }
 }

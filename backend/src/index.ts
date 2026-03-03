@@ -1,3 +1,4 @@
+import { WebSocket, WebSocketServer, RawData } from "ws";
 import { AnyMessageSchema, createErrorMessage } from "./messages.js";
 import { roomManager } from "./state.js";
 
@@ -5,15 +6,15 @@ const wss = new WebSocketServer({ port: 8080 });
 
 console.log("WebSocket signaling server running on ws://localhost:8080");
 
-wss.on("connection", (ws) => {
+wss.on("connection", (ws: WebSocket) => {
     let currentRoomId: string | null = null;
     let currentPeerId: string | null = null;
 
     console.log("Client connected");
 
-    ws.on("message", (data) => {
+    ws.on("message", (data: RawData) => {
         // Enforce arbitrary 64KB max message size
-        if (data.length > 64 * 1024) {
+        if (data.toString().length > 64 * 1024) {
             ws.send(createErrorMessage("BAD_MESSAGE", "Payload too large"));
             return;
         }
@@ -23,7 +24,7 @@ wss.on("connection", (ws) => {
             const parsed = AnyMessageSchema.safeParse(parsedJson);
 
             if (!parsed.success) {
-                console.warn(`Validation failed: ${JSON.stringify(parsed.error.errors)}`);
+                console.warn(`Validation failed: ${JSON.stringify(parsed.error.issues)}`);
                 ws.send(createErrorMessage("BAD_MESSAGE", "Invalid message format"));
                 return;
             }
