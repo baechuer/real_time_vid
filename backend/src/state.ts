@@ -110,7 +110,7 @@ export class RoomManager {
                     // Force broadcast expiration
                     room.peers.forEach(peer => {
                         if (peer.ws.readyState === WebSocket.OPEN) {
-                            peer.ws.send(JSON.stringify({ type: "error", code: "ROOM_NOT_FOUND", message: "Room expired due to inactivity." }));
+                            peer.ws.send(JSON.stringify({ type: "error", code: "ROOM_EXPIRED", message: "Room expired due to inactivity." }));
                             peer.ws.close();
                         }
                     });

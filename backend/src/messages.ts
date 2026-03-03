@@ -4,6 +4,7 @@ import { z } from "zod";
 export const ErrorCodes = {
     ROOM_FULL: "ROOM_FULL",
     ROOM_NOT_FOUND: "ROOM_NOT_FOUND",
+    ROOM_EXPIRED: "ROOM_EXPIRED",
     BAD_MESSAGE: "BAD_MESSAGE",
     NOT_JOINED: "NOT_JOINED",
     PEER_NOT_READY: "PEER_NOT_READY",
@@ -40,9 +41,15 @@ export const AnswerMessageSchema = BaseMessageSchema.extend({
 
 export const IceCandidateMessageSchema = BaseMessageSchema.extend({
     type: z.literal("ice-candidate"),
-    candidate: z.any(), // RTCIceCandidateInit payload
+    candidate: z.object({
+        candidate: z.string(),
+        sdpMid: z.string().nullable(),
+        sdpMLineIndex: z.number().nullable(),
+        usernameFragment: z.string().optional()
+    }).nullable() // It can be null for end-of-candidates
 });
 
+// Client intentionally hanging up
 export const HangupMessageSchema = BaseMessageSchema.extend({
     type: z.literal("hangup"),
 });
