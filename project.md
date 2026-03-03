@@ -90,36 +90,36 @@ The frontend application runs in the browser and handles local media capture and
 This execution plan prioritizes zero-dependency foundations, followed by basic plumbing, and finally robustness/edge-case handling.
 
 ### Phase 0: Repo & Tooling
-- [ ] Initialize monorepo or standard folder structure (`backend/`, `frontend/`).
-- [ ] Setup Node.js + TS environment (`tsx` for dev, `tsc` for build).
-- [ ] Implement basic Linting/Formatting.
+- [*] Initialize monorepo or standard folder structure (`backend/`, `frontend/`).
+- [*] Setup Node.js + TS environment (`tsx` for dev, `tsc` for build).
+- [*] Implement basic Linting/Formatting.
 > **Done when**: `npm run dev` successfully spins up a raw WS server and build artifacts are executable.
 
 ### Phase 1: Signaling Protocol & Error Codes
-- [ ] Define standardized Message Schema (TS Types + Runtime schema validation like Zod).
-- [ ] Define standardized Error Codes: `ROOM_FULL`, `BAD_MESSAGE`, `NOT_JOINED`, `PEER_NOT_READY`, `PEER_DISCONNECTED`.
-- [ ] Draft constraints/types for `roomId` and `peerId`.
+- [x] Define standardized Message Schema (TS Types + Runtime schema validation like Zod).
+- [x] Define standardized Error Codes: `ROOM_FULL`, `BAD_MESSAGE`, `NOT_JOINED`, `PEER_NOT_READY`, `PEER_DISCONNECTED`.
+- [x] Draft constraints/types for `roomId` and `peerId`.
 > **Done when**: Server safely drops or replies with errors to badly formatted WS payloads without crashing.
 
 ### Phase 2: Room/Peer State Machine
-- [ ] Implement robust Memory State: `roomId -> { peers: Map<peerId, ws> }`.
-- [ ] Implement `join`/`leave` logic (enforcing 2-peer maximum and empty-room destruction).
-- [ ] Implement `forward` logic to securely route `offer`/`answer`/`ice`/`hangup` only to the remote peer.
-- [ ] Attach payload size limits and pure JSON parse guards.
+- [x] Implement robust Memory State: `roomId -> { peers: Map<peerId, ws> }`.
+- [x] Implement `join`/`leave` logic (enforcing 2-peer maximum and empty-room destruction).
+- [x] Implement `forward` logic to securely route `offer`/`answer`/`ice`/`hangup` only to the remote peer.
+- [x] Attach payload size limits and pure JSON parse guards.
 > **Done when**: Two local peers can join the same room and reliably bounce mock JSON messages. Third peer is rejected.
 
 ### Phase 3: Client Basic WebRTC Happy Path
-- [ ] Build minimal UI: Room input, Join/Leave buttons, Local/Remote `<video>` containers, Status indicator.
-- [ ] Hook up `getUserMedia` and local preview.
-- [ ] Scaffold `RTCPeerConnection` (add tracks, create offer/answer, set local/remote descriptions).
-- [ ] Setup `onicecandidate` to trigger signaling, and handle incoming `offer`/`answer`.
-- [ ] Implement `ontrack` to map the remote media stream to the respective `<video>` element.
+- [x] Build minimal UI: Room input, Join/Leave buttons, Local/Remote `<video>` containers, Status indicator.
+- [x] Hook up `getUserMedia` and local preview.
+- [x] Scaffold `RTCPeerConnection` (add tracks, create offer/answer, set local/remote descriptions).
+- [x] Setup `onicecandidate` to trigger signaling, and handle incoming `offer`/`answer`.
+- [x] Implement `ontrack` to map the remote media stream to the respective `<video>` element.
 > **Done when**: Two browser tabs on the same machine/LAN can successfully establish a video/audio feed.
 
 ### Phase 4: Client Robustness (Candidate Buffering & Negotiation Guards)
-- [ ] Buffer incoming ICE candidates if `remoteDescription` is null; flush buffer upon `setRemoteDescription` completion.
-- [ ] Filter duplicate/out-of-order signaling messages (ignore rogue messages for invalid rooms or disconnected sessions).
-- [ ] Gatekeeper: Only permit signaling outbox if the peer is formally in the `joined` state.
+- [x] Buffer incoming ICE candidates if `remoteDescription` is null; flush buffer upon `setRemoteDescription` completion.
+- [x] Filter duplicate/out-of-order signaling messages (ignore rogue messages for invalid rooms or disconnected sessions).
+- [x] Gatekeeper: Only permit signaling outbox if the peer is formally in the `joined` state.
 > **Done when**: Artificial delays/shuffles added to ICE payload delivery do not crash or stall the connection logic.
 
 ### Phase 5: Failure Handling (Timeout + ICE Failed UX)

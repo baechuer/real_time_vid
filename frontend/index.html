@@ -2,12 +2,33 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>STUN-Only WebRTC Call</title>
+    <link rel="stylesheet" href="./style.css">
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <header>
+        <h1>STUN-Only WebRTC Call</h1>
+        <div id="controls-container">
+            <button id="btn-start" class="btn primary">Start Meeting</button>
+            <button id="btn-hangup" class="btn danger hidden">Hangup</button>
+            <div id="room-link-container" class="hidden">
+                <span id="room-link-text"></span>
+                <button id="btn-copy" class="btn secondary">Copy Link</button>
+            </div>
+        </div>
+        <div id="status-bar">Status: <span id="status-text">Disconnected</span></div>
+      </header>
+      
+      <main id="video-container">
+        <video id="remote-video" autoplay playsinline></video>
+        <!-- Local video is smaller and floats over the remote video -->
+        <video id="local-video" autoplay playsinline muted></video>
+      </main>
+      
+      <div id="error-banner" class="hidden"></div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
