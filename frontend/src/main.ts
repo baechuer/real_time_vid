@@ -11,6 +11,7 @@ const btnCopy = document.getElementById("btn-copy") as HTMLButtonElement;
 
 const localVideo = document.getElementById("local-video") as HTMLVideoElement;
 const remoteVideo = document.getElementById("remote-video") as HTMLVideoElement;
+const remoteWrapper = document.getElementById("remote-wrapper") as HTMLDivElement;
 
 const statusText = document.getElementById("status-text") as HTMLSpanElement;
 const errorBanner = document.getElementById("error-banner") as HTMLDivElement;
@@ -157,6 +158,7 @@ async function initPeerConnection() {
   // Handle remote tracks arriving
   pc.ontrack = (event) => {
     console.log("[WebRTC] Received remote track");
+    remoteWrapper.classList.remove("hidden"); // Reveal the parallel box when partner stream connects
     if (remoteVideo.srcObject !== event.streams[0]) {
       remoteVideo.srcObject = event.streams[0];
     }
@@ -368,6 +370,7 @@ function teardown(killSocket: boolean) {
     ws = null;
   }
 
+  remoteWrapper.classList.add("hidden");
   roomLinkContainer.classList.add("hidden");
   btnHangup.classList.add("hidden");
   btnStart.classList.remove("hidden");
