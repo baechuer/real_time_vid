@@ -119,6 +119,48 @@ async function runTests() {
         });
     });
 
+    // Test 5: Rejection of 3rd person limits
+    const maliciousWs = new WebSocket(HOST);
+    await new Promise((resolve) => maliciousWs.on("open", resolve));
+    maliciousWs.send(JSON.stringify({ type: "join", roomId: createdRoomId, sessionId: "malicious-user-456" }));
+
+    await new Promise<void>((resolve) => {
+        maliciousWs.once("message", (data) => {
+            const msg = JSON.parse(data.toString());
+            if (msg.type === "error" && msg.code === "ROOM_FULL") {
+                console.log("✅ Test 5a: Malicious 3rd user successfully blocked by ROOM_FULL.");
+
+                maliciousWs.once("close", () => {
+                    console.log("✅ Test 5b: Malicious 3rd user's socket was aggressively killed by server.");
+                    resolve();
+                });
+            } else {
+                console.error("❌ Test 5a Failed: Malicious 3rd user slipped past the guards.");
+            }
+        });
+    });
+
+    // Test 6: Capacity Re-balance (3rd user joins AFTER someone leaves)
+    console.log("⏳ Simulating Host hanging up...");
+    hostWs1.close();
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for server to process close
+
+    const newGuestWs = new WebSocket(HOST);
+    await new Promise((resolve) => newGuestWs.on("open", resolve));
+    newGuestWs.send(JSON.stringify({ type: "join", roomId: createdRoomId, sessionId: "polite-guest-789" }));
+
+    await new Promise<void>((resolve) => {
+        newGuestWs.once("message", (data) => {
+            const msg = JSON.parse(data.toString());
+            if (msg.type === "joined" && msg.isHost === false) { // The remaining peer friendWs3 took over host, so new guy is guest
+                console.log("✅ Test 6: New user successfully joined the empty slot after original Host left.");
+                resolve();
+            } else {
+                console.error("❌ Test 6 Failed: Re-entry was blocked even though there was a free slot.", msg);
+            }
+        });
+    });
+
     console.log("=== All Tests Passed ===");
     process.exit(0);
 }
