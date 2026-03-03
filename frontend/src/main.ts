@@ -31,10 +31,10 @@ let iceCandidateQueue: RTCIceCandidateInit[] = [];
 // 1. Initialize
 // ==============================
 function getSessionId(): string {
-  let id = localStorage.getItem("sessionId");
+  let id = sessionStorage.getItem("sessionId");
   if (!id) {
     id = crypto.randomUUID();
-    localStorage.setItem("sessionId", id);
+    sessionStorage.setItem("sessionId", id);
   }
   return id;
 }

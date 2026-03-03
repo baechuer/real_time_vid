@@ -65,8 +65,16 @@ wss.on("connection", (ws: WebSocket) => {
 
                 // Check limits (allow reconnects for the same sessionId)
                 if (room.peers.size >= 2 && !room.peers.has(message.sessionId)) {
+                    console.log(`[Room ${targetRoomId}] Rejecting 3rd peer ${message.sessionId}. Room is FULL.`);
                     ws.send(createErrorMessage("ROOM_FULL", "Room is already full"));
                     return;
+                }
+
+                const existingPeer = room.peers.get(message.sessionId);
+                if (existingPeer && existingPeer.ws.readyState === WebSocket.OPEN && existingPeer.ws !== ws) {
+                    console.log(`[Room ${targetRoomId}] Session ${message.sessionId} hijacked by a new tab. Kicking old connection.`);
+                    existingPeer.ws.send(createErrorMessage("BAD_MESSAGE", "Session resumed in another tab."));
+                    existingPeer.ws.close();
                 }
 
                 currentRoomId = targetRoomId;
